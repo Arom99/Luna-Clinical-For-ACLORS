@@ -1,22 +1,40 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { ArrowLeft, Search, Star, MapPin, Heart } from 'lucide-react';
-
-const doctors = [
-  { id: 1, name: 'Dr. Sarah Johnson', specialty: 'Pathologist', location: 'Sydney CBD', rating: 4.9, reviews: 156, available: true, favorite: false },
-  { id: 2, name: 'Dr. Michael Chen', specialty: 'Lab Director', location: 'Parramatta', rating: 4.8, reviews: 142, available: true, favorite: true },
-  { id: 3, name: 'Dr. Emma Williams', specialty: 'Clinical Pathologist', location: 'North Sydney', rating: 4.7, reviews: 98, available: false, favorite: false },
-  { id: 4, name: 'Dr. James Brown', specialty: 'Hematologist', location: 'Bondi', rating: 4.9, reviews: 203, available: true, favorite: false },
-];
+import { doctors } from '@/app/data/doctors';
 
 export const DoctorsListScreen = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [selectedLocation, setSelectedLocation] = useState<string>(location.state?.locationId || 'all');
+  const [selectedSpecialty, setSelectedSpecialty] = useState('all');
 
-  const filters = ['All', 'Available Now', 'Top Rated', 'Favorites'];
+  const filters = ['All', 'Available Now', 'Top Rated'];
+
+  // Get unique locations and specialties
+  const locations = Array.from(new Set(doctors.map(d => d.location)));
+  const specialties = Array.from(new Set(doctors.map(d => d.specialty)));
+
+  // Filter doctors
+  let filteredDoctors = doctors.filter(
+    (doc) =>
+      (doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.location.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      (selectedLocation === 'all' || doc.locationId === selectedLocation) &&
+      (selectedSpecialty === 'all' || doc.specialty === selectedSpecialty)
+  );
+
+  if (selectedFilter === 'available-now') {
+    filteredDoctors = filteredDoctors.filter(d => d.available);
+  } else if (selectedFilter === 'top-rated') {
+    filteredDoctors = filteredDoctors.filter(d => d.rating >= 4.8);
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -45,26 +63,60 @@ export const DoctorsListScreen = () => {
 
       {/* Content */}
       <div className="container mx-auto px-4 md:px-8 py-6 max-w-7xl">
-        {/* Filters - Mobile: Scroll, Desktop: Flex */}
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-          {filters.map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setSelectedFilter(filter.toLowerCase().replace(' ', '-'))}
-              className={`px-4 py-2 rounded-full whitespace-nowrap ${
-                selectedFilter === filter.toLowerCase().replace(' ', '-')
-                  ? 'bg-[#FFC0CB] text-white'
-                  : 'bg-gray-100 text-[#A9A9A9]'
-              }`}
-            >
-              {filter}
-            </button>
-          ))}
+        {/* Filters Row */}
+        <div className="grid md:grid-cols-3 gap-3 mb-4">
+          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Locations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locations.map((loc) => (
+                <SelectItem key={loc} value={doctors.find(d => d.location === loc)?.locationId || loc}>
+                  {loc}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Specialties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Specialties</SelectItem>
+              {specialties.map((spec) => (
+                <SelectItem key={spec} value={spec}>
+                  {spec}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex gap-2">
+            {filters.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setSelectedFilter(filter.toLowerCase().replace(' ', '-'))}
+                className={`px-4 py-2 rounded-full whitespace-nowrap text-sm ${
+                  selectedFilter === filter.toLowerCase().replace(' ', '-')
+                    ? 'bg-[#FFC0CB] text-white'
+                    : 'bg-gray-100 text-[#A9A9A9]'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
         </div>
+
+        <p className="text-sm text-[#A9A9A9] mb-4">
+          {filteredDoctors.length} doctor{filteredDoctors.length !== 1 ? 's' : ''} found
+        </p>
 
         {/* Doctors Grid - Mobile: 1 col, Desktop: 2 cols */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {doctors.map((doctor) => (
+          {filteredDoctors.map((doctor) => (
             <div
               key={doctor.id}
               className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow"

@@ -1,6 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { AuthProvider, useAuth } from '@/app/context/AuthContext';
+import { AppProvider } from '@/app/context/AppContext';
 import { FloatingAIChat } from '@/app/components/FloatingAIChat';
+import { Toaster } from '@/app/components/ui/sonner';
 
 // Customer Pages
 import { SplashScreen } from '@/app/pages/customer/SplashScreen';
@@ -10,11 +12,19 @@ import { SignUpScreen } from '@/app/pages/customer/SignUpScreen';
 import { HomeScreen } from '@/app/pages/customer/HomeScreen';
 import { DoctorsListScreen } from '@/app/pages/customer/DoctorsListScreen';
 import { DoctorDetailScreen } from '@/app/pages/customer/DoctorDetailScreen';
+import { DoctorChatScreen } from '@/app/pages/customer/DoctorChatScreen';
 import { MyProfileScreen } from '@/app/pages/customer/MyProfileScreen';
+import { EditProfileScreen } from '@/app/pages/customer/EditProfileScreen';
+import { NotificationsScreen } from '@/app/pages/customer/NotificationsScreen';
 import { AppointmentsScreen } from '@/app/pages/customer/AppointmentsScreen';
 import { ViewResultsScreen } from '@/app/pages/customer/ViewResultsScreen';
 import { PaymentMethodsScreen } from '@/app/pages/customer/PaymentMethodsScreen';
 import { DoctorScheduleScreen } from '@/app/pages/customer/DoctorScheduleScreen';
+import { AboutUsScreen } from '@/app/pages/customer/AboutUsScreen';
+import { PrivacyPolicyScreen } from '@/app/pages/customer/PrivacyPolicyScreen';
+import { ContactUsScreen } from '@/app/pages/customer/ContactUsScreen';
+import { LocationsScreen } from '@/app/pages/customer/LocationsScreen';
+import { BookAppointmentScreen } from '@/app/pages/customer/BookAppointmentScreen';
 
 // Admin Pages
 import { AdminDashboard } from '@/app/pages/admin/AdminDashboard';
@@ -79,7 +89,7 @@ const AppRoutes = () => {
           path="/schedule/:id"
           element={
             <ProtectedRoute>
-              <DoctorScheduleScreen />
+              <BookAppointmentScreen />
             </ProtectedRoute>
           }
         />
@@ -100,6 +110,22 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="/edit-profile"
+          element={
+            <ProtectedRoute>
+              <EditProfileScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/results"
           element={
             <ProtectedRoute>
@@ -112,6 +138,54 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <PaymentMethodsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/about-us"
+          element={
+            <ProtectedRoute>
+              <AboutUsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/privacy-policy"
+          element={
+            <ProtectedRoute>
+              <PrivacyPolicyScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/contact-us"
+          element={
+            <ProtectedRoute>
+              <ContactUsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/locations"
+          element={
+            <ProtectedRoute>
+              <LocationsScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/book-appointment"
+          element={
+            <ProtectedRoute>
+              <BookAppointmentScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/doctor-chat/:id"
+          element={
+            <ProtectedRoute>
+              <DoctorChatScreen />
             </ProtectedRoute>
           }
         />
@@ -185,6 +259,7 @@ const AppRoutes = () => {
       
       {/* Show AI Chat only for authenticated users */}
       {isAuthenticated && <FloatingAIChat />}
+      <Toaster />
     </div>
   );
 };
@@ -193,7 +268,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <AppProvider>
+          <AppRoutes />
+        </AppProvider>
       </AuthProvider>
     </BrowserRouter>
   );

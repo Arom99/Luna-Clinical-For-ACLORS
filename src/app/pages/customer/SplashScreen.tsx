@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Logo } from '@/app/components/Logo';
 import { motion } from 'motion/react';
 

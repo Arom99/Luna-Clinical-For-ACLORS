@@ -1,14 +1,18 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuth } from '@/app/context/AuthContext';
+import { useApp } from '@/app/context/AppContext';
 import { Button } from '@/app/components/ui/button';
-import { ArrowLeft, User, Mail, Phone, CreditCard, Settings, LogOut } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, CreditCard, Settings, LogOut, Shield, FileText } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const MyProfileScreen = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { userProfile } = useApp();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
+    toast.success('Logged out successfully');
     navigate('/welcome');
   };
 
@@ -29,8 +33,8 @@ export const MyProfileScreen = () => {
           <div className="w-24 h-24 bg-[#ADD8E6] rounded-full mx-auto mb-4 flex items-center justify-center">
             <User size={48} className="text-white" />
           </div>
-          <h2>{user?.name || 'Patient User'}</h2>
-          <p className="text-[#A9A9A9]">{user?.email}</p>
+          <h2>{userProfile?.name || user?.name || 'Patient User'}</h2>
+          <p className="text-[#A9A9A9]">{userProfile?.email || user?.email}</p>
         </div>
 
         <div className="space-y-3">
@@ -38,7 +42,7 @@ export const MyProfileScreen = () => {
             <Mail size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Email</p>
-              <p>{user?.email}</p>
+              <p>{userProfile?.email || user?.email}</p>
             </div>
           </div>
 
@@ -46,7 +50,7 @@ export const MyProfileScreen = () => {
             <Phone size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Phone</p>
-              <p>+1 (555) 123-4567</p>
+              <p>{userProfile?.countryCode} {userProfile?.phone || '+1 (555) 123-4567'}</p>
             </div>
           </div>
 
@@ -54,15 +58,27 @@ export const MyProfileScreen = () => {
             <CreditCard size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Medicare Number</p>
-              <p>1234 56789 0</p>
+              <p>{userProfile?.medicalNumber || '1234 56789 0'}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-lg">
+            <Shield size={20} className="text-[#FFC0CB]" />
+            <div>
+              <p className="text-sm text-[#A9A9A9]">Insurance</p>
+              <p>{userProfile?.insuranceProvider || 'Medicare'} - {userProfile?.insuranceNumber || 'MED-123456'}</p>
             </div>
           </div>
         </div>
 
         <div className="mt-6 space-y-3">
-          <Button variant="outline" className="w-full justify-start" onClick={() => {}}>
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/edit-profile')}>
             <Settings size={20} className="mr-3" />
             Edit Profile
+          </Button>
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/notifications')}>
+            <FileText size={20} className="mr-3" />
+            Notification Settings
           </Button>
           <Button
             variant="outline"

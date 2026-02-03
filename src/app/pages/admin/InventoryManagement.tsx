@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Button } from '@/app/components/ui/button';
 import { ArrowLeft, AlertCircle, Package, TrendingDown } from 'lucide-react';
 

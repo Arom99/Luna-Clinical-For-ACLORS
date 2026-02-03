@@ -1,25 +1,27 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuth } from '@/app/context/AuthContext';
 import { Logo } from '@/app/components/Logo';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Checkbox } from '@/app/components/ui/checkbox';
+import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export const LoginScreen = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    const success = login(email, password);
+    const success = await login(email, password, rememberMe);
     
     if (success) {
       // Redirect based on email (admin vs customer)
@@ -100,7 +102,17 @@ export const LoginScreen = () => {
               </div>
             </div>
 
-            <div className="text-right">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
+                  Remember me
+                </Label>
+              </div>
               <button
                 type="button"
                 className="text-[#FFC0CB] text-sm hover:underline"
@@ -111,9 +123,17 @@ export const LoginScreen = () => {
 
             <Button
               type="submit"
+              disabled={isLoading}
               className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12"
             >
-              Log In
+              {isLoading ? (
+                <>
+                  <Loader2 size={20} className="mr-2 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Log In'
+              )}
             </Button>
 
             <div className="text-center text-sm text-[#A9A9A9]">

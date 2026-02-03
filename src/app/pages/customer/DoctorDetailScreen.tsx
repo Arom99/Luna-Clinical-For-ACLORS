@@ -1,6 +1,6 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { Button } from '@/app/components/ui/button';
-import { ArrowLeft, Star, MapPin, Clock, Calendar, Award } from 'lucide-react';
+import { ArrowLeft, Star, MapPin, Clock, Calendar, Award, MessageCircle } from 'lucide-react';
 
 export const DoctorDetailScreen = () => {
   const navigate = useNavigate();
@@ -98,9 +98,11 @@ export const DoctorDetailScreen = () => {
             Book Appointment
           </Button>
           <Button
+            onClick={() => navigate(`/doctor-chat/${id}`)}
             variant="outline"
             className="flex-1 border-[#FFC0CB] text-[#FFC0CB] hover:bg-[#FFC0CB] hover:text-white h-12"
           >
+            <MessageCircle size={20} className="mr-2" />
             Message Doctor
           </Button>
         </div>

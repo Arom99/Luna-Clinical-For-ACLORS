@@ -1,139 +1,120 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/app/components/ui/button';
-import { ArrowLeft, AlertCircle, Package, TrendingDown } from 'lucide-react';
-
-const inventoryItems = [
-  { id: 1, name: 'Blood Collection Tubes', stock: 150, reorderLevel: 50, status: 'Good', category: 'Supplies' },
-  { id: 2, name: 'Test Reagents - CBC', stock: 25, reorderLevel: 30, status: 'Low', category: 'Reagents' },
-  { id: 3, name: 'Sterile Gloves (Box)', stock: 80, reorderLevel: 40, status: 'Good', category: 'PPE' },
-  { id: 4, name: 'Microscope Slides', stock: 15, reorderLevel: 50, status: 'Critical', category: 'Equipment' },
-  { id: 5, name: 'Sample Labels', stock: 300, reorderLevel: 100, status: 'Good', category: 'Supplies' },
-];
+import { Input } from '@/app/components/ui/input';
+import { ArrowLeft, Package, Plus, ShoppingCart, Loader2, Save, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const InventoryManagement = () => {
   const navigate = useNavigate();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  
+  // New Item Form
+  const [newItem, setNewItem] = useState({ name: '', category: 'Supplies', stock: 100, reorderLevel: 20 });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Good':
-        return 'bg-green-100 text-green-600';
-      case 'Low':
-        return 'bg-yellow-100 text-yellow-600';
-      case 'Critical':
-        return 'bg-red-100 text-red-600';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
+  const fetchInventory = () => {
+    fetch('http://localhost:5000/inventory')
+      .then(res => res.json())
+      .then(data => { setItems(data); setLoading(false); });
+  };
+
+  useEffect(() => { fetchInventory(); }, []);
+
+  const handleAddItem = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/inventory', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(newItem)
+      });
+      if (res.ok) {
+        toast.success("Item Added!");
+        setShowAddModal(false);
+        fetchInventory();
+      }
+    } catch (e) { toast.error("Failed to add item"); }
+  };
+
+  const handleOrder = async (id: string) => {
+    try {
+      await fetch('http://localhost:5000/inventory/order', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ itemId: id, quantity: 50 })
+      });
+      toast.success("Stock Ordered (+50)");
+      fetchInventory();
+    } catch (e) { toast.error("Order Failed"); }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="container mx-auto max-w-7xl">
-          <button onClick={() => navigate('/admin')} className="flex items-center gap-2 mb-4 text-[#A9A9A9] hover:text-[#333333]">
-            <ArrowLeft size={20} />
-            Back to Dashboard
-          </button>
-          <div className="flex justify-between items-center">
-            <h1>Inventory Management</h1>
-            <Button className="bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white">
-              <Package size={20} className="mr-2" />
-              Add Item
-            </Button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gray-50 p-6 relative">
+      <Button variant="ghost" onClick={() => navigate('/admin')} className="mb-4">
+        <ArrowLeft size={16} className="mr-2"/> Dashboard
+      </Button>
+      
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Inventory</h1>
+        <Button onClick={() => setShowAddModal(true)} className="bg-[#FFC0CB] hover:bg-[#FFB0BB]">
+          <Plus size={20} className="mr-2"/> Add Item
+        </Button>
       </div>
 
-      <div className="container mx-auto max-w-7xl p-6">
-        {/* Alert Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[#A9A9A9]">Total Items</p>
-                <h2 className="text-2xl font-semibold mt-1">{inventoryItems.length}</h2>
-              </div>
-              <Package size={32} className="text-[#ADD8E6]" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-yellow-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[#A9A9A9]">Low Stock Items</p>
-                <h2 className="text-2xl font-semibold mt-1 text-yellow-600">
-                  {inventoryItems.filter(i => i.status === 'Low').length}
-                </h2>
-              </div>
-              <TrendingDown size={32} className="text-yellow-500" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-red-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[#A9A9A9]">Critical Stock</p>
-                <h2 className="text-2xl font-semibold mt-1 text-red-600">
-                  {inventoryItems.filter(i => i.status === 'Critical').length}
-                </h2>
-              </div>
-              <AlertCircle size={32} className="text-red-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Inventory Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#A9A9A9] uppercase">Item</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#A9A9A9] uppercase">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#A9A9A9] uppercase">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#A9A9A9] uppercase">Reorder Level</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-[#A9A9A9] uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-[#A9A9A9] uppercase">Actions</th>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-100 border-b">
+            <tr>
+              <th className="p-4 text-left">Item Name</th>
+              <th className="p-4 text-left">Category</th>
+              <th className="p-4 text-left">Stock</th>
+              <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map(item => (
+              <tr key={item._id} className="border-b hover:bg-gray-50">
+                <td className="p-4 font-medium">{item.name}</td>
+                <td className="p-4 text-gray-500">{item.category}</td>
+                <td className="p-4 font-bold">{item.stock}</td>
+                <td className="p-4">
+                  <span className={`px-2 py-1 rounded text-xs ${item.status === 'Good' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {item.status}
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <Button size="sm" onClick={() => handleOrder(item._id)} variant="outline">
+                    <ShoppingCart size={14} className="mr-2"/> Order +50
+                  </Button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {inventoryItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#ADD8E6] bg-opacity-20 rounded-lg flex items-center justify-center">
-                        <Package size={20} className="text-[#ADD8E6]" />
-                      </div>
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-[#A9A9A9]">{item.category}</td>
-                  <td className="px-6 py-4">
-                    <span className="font-medium">{item.stock}</span> units
-                  </td>
-                  <td className="px-6 py-4 text-sm text-[#A9A9A9]">{item.reorderLevel} units</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs ${getStatusColor(item.status)}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button
-                      size="sm"
-                      className={`${
-                        item.status !== 'Good'
-                          ? 'bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
-                    >
-                      {item.status !== 'Good' ? 'Reorder' : 'Update'}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {/* Add Item Modal (Simple Overlay) */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 shadow-xl">
+            <div className="flex justify-between mb-4">
+              <h3 className="font-bold text-lg">Add New Inventory Item</h3>
+              <button onClick={() => setShowAddModal(false)}><X size={20}/></button>
+            </div>
+            <div className="space-y-4">
+              <div><label>Name</label><Input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})}/></div>
+              <div><label>Category</label><Input value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})}/></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label>Stock</label><Input type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: Number(e.target.value)})}/></div>
+                <div><label>Reorder Level</label><Input type="number" value={newItem.reorderLevel} onChange={e => setNewItem({...newItem, reorderLevel: Number(e.target.value)})}/></div>
+              </div>
+              <Button onClick={handleAddItem} className="w-full bg-[#FFC0CB] mt-2">Save Item</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

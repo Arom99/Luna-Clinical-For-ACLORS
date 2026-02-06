@@ -4,10 +4,12 @@ import { Logo } from '@/app/components/Logo';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const SignUpScreen = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -17,10 +19,54 @@ export const SignUpScreen = () => {
     confirmPassword: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In real app, would validate and create account
-    navigate('/login');
+
+    // 1. Validate cơ bản
+    if (formData.password !== formData.confirmPassword) {
+      toast.error("Passwords do not match!");
+      return;
+    }
+
+    if (formData.password.length < 3) {
+      toast.error("Password must be at least 3 characters");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 2. Gửi dữ liệu về Server (Database)
+      const res = await fetch('http://localhost:5000/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email, // Server sẽ tự động chuyển thành chữ thường
+          password: formData.password,
+          phone: formData.phone,
+          medicalNumber: formData.medicare, // Lưu số Medicare vào DB
+          role: 'Customer', // Mặc định là khách hàng
+          status: 'Active'
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success("Account created successfully! Please log in.");
+        // Đợi 1 chút rồi chuyển sang trang login
+        setTimeout(() => navigate('/login'), 1000);
+      } else {
+        // Hiển thị lỗi từ server (ví dụ: Email đã tồn tại)
+        toast.error(data.error || "Sign up failed. Please try again.");
+      }
+    } catch (err) {
+      toast.error("Cannot connect to server. Is it running?");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,7 +86,7 @@ export const SignUpScreen = () => {
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="mb-2">Create Account</h1>
+            <h1 className="mb-2 text-2xl font-bold">Create Account</h1>
             <p className="text-[#A9A9A9]">Join Luna Clinical today</p>
           </div>
 
@@ -92,7 +138,7 @@ export const SignUpScreen = () => {
                 onChange={(e) => setFormData({ ...formData, medicare: e.target.value })}
                 className="bg-[#F0F0F0] border-0"
               />
-              <p className="text-xs text-[#A9A9A9]">Validation: 10 digits, format: XXXX XXXXX X</p>
+              <p className="text-xs text-[#A9A9A9]">This will be saved to your medical profile</p>
             </div>
 
             <div className="space-y-2">
@@ -123,17 +169,19 @@ export const SignUpScreen = () => {
 
             <Button
               type="submit"
-              className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12"
+              disabled={loading}
+              className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12 text-lg font-medium transition-all"
             >
-              Sign Up
+              {loading ? <Loader2 className="animate-spin mr-2" /> : null}
+              {loading ? 'Creating Account...' : 'Sign Up'}
             </Button>
 
-            <div className="text-center text-sm text-[#A9A9A9]">
+            <div className="text-center text-sm text-[#A9A9A9] mt-4">
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="text-[#FFC0CB] hover:underline"
+                className="text-[#FFC0CB] hover:underline font-medium"
               >
                 Log In
               </button>

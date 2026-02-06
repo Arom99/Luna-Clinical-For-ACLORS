@@ -1,20 +1,61 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '@/app/context/AuthContext';
-import { useApp } from '@/app/context/AppContext';
 import { Button } from '@/app/components/ui/button';
-import { ArrowLeft, User, Mail, Phone, CreditCard, Settings, LogOut, Shield, FileText } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, CreditCard, Settings, LogOut, Shield, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const MyProfileScreen = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { userProfile } = useApp();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (user?.email) {
+      // Gọi API với email đã trim khoảng trắng
+      fetch(`http://localhost:5000/users/email/${user.email.trim()}`)
+        .then(res => {
+          if (!res.ok) throw new Error("User not found");
+          return res.json();
+        })
+        .then(data => {
+          setProfile(data);
+          setLoading(false);
+        })
+        .catch(() => {
+          console.error("Profile fetch failed");
+          setError(true);
+          setLoading(false);
+        });
+    } else {
+        setLoading(false);
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
-    toast.success('Logged out successfully');
     navigate('/welcome');
   };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#FFC0CB]"/></div>;
+
+  // GIAO DIỆN LỖI (FIX ĐẸP HƠN)
+  if (error || !profile) {
+    return (
+      <div className="min-h-screen bg-white p-6 flex flex-col items-center justify-center text-center">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle size={32} className="text-red-400"/>
+        </div>
+        <h2 className="text-xl font-bold mb-2 text-gray-800">Profile Not Found</h2>
+        <p className="text-gray-500 mb-6 max-w-xs">It seems your account data is missing or mismatched. Please try logging in again.</p>
+        <Button onClick={handleLogout} className="bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white px-8 h-12 shadow-md">
+            Log Out & Retry
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -33,8 +74,11 @@ export const MyProfileScreen = () => {
           <div className="w-24 h-24 bg-[#ADD8E6] rounded-full mx-auto mb-4 flex items-center justify-center">
             <User size={48} className="text-white" />
           </div>
-          <h2>{userProfile?.name || user?.name || 'Patient User'}</h2>
-          <p className="text-[#A9A9A9]">{userProfile?.email || user?.email}</p>
+          <h2 className="font-bold text-xl">{profile.name}</h2>
+          <p className="text-[#A9A9A9]">{profile.email}</p>
+          <div className="mt-2 inline-block px-3 py-1 bg-white rounded-full text-xs text-gray-500 shadow-sm">
+            ID: {profile.customId}
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -42,7 +86,7 @@ export const MyProfileScreen = () => {
             <Mail size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Email</p>
-              <p>{userProfile?.email || user?.email}</p>
+              <p>{profile.email}</p>
             </div>
           </div>
 
@@ -50,7 +94,7 @@ export const MyProfileScreen = () => {
             <Phone size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Phone</p>
-              <p>{userProfile?.countryCode} {userProfile?.phone || '+1 (555) 123-4567'}</p>
+              <p>{profile.countryCode} {profile.phone || 'Not set'}</p>
             </div>
           </div>
 
@@ -58,7 +102,7 @@ export const MyProfileScreen = () => {
             <CreditCard size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Medicare Number</p>
-              <p>{userProfile?.medicalNumber || '1234 56789 0'}</p>
+              <p>{profile.medicalNumber || 'Not set'}</p>
             </div>
           </div>
 
@@ -66,7 +110,7 @@ export const MyProfileScreen = () => {
             <Shield size={20} className="text-[#FFC0CB]" />
             <div>
               <p className="text-sm text-[#A9A9A9]">Insurance</p>
-              <p>{userProfile?.insuranceProvider || 'Medicare'} - {userProfile?.insuranceNumber || 'MED-123456'}</p>
+              <p>{profile.insuranceProvider || 'None'} - {profile.insuranceNumber}</p>
             </div>
           </div>
         </div>

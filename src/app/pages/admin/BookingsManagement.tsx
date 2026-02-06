@@ -1,258 +1,161 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/app/components/ui/button';
-import { Calendar } from '@/app/components/ui/calendar';
+import { ArrowLeft, CheckCircle, Trash2, Search, Loader2, Upload, X, FileText } from 'lucide-react';
 import { Input } from '@/app/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { ArrowLeft, CheckCircle, XCircle, Calendar as CalendarIcon, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Booking {
-  id: number;
-  patient: string;
-  patientEmail: string;
-  doctor: string;
-  date: string;
-  time: string;
-  status: 'Pending' | 'Approved' | 'Completed' | 'Cancelled';
-  test: string;
-  amount: number;
-}
 
 export const BookingsManagement = () => {
   const navigate = useNavigate();
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   
-  const [bookings, setBookings] = useState<Booking[]>([
-    { id: 1, patient: 'John Doe', patientEmail: 'john@example.com', doctor: 'Dr. Sarah Johnson', date: '2026-02-05', time: '10:00 AM', status: 'Approved', test: 'Blood Test', amount: 150 },
-    { id: 2, patient: 'Jane Smith', patientEmail: 'jane@example.com', doctor: 'Dr. Michael Chen', date: '2026-02-06', time: '2:30 PM', status: 'Pending', test: 'Lipid Panel', amount: 200 },
-    { id: 3, patient: 'Mike Johnson', patientEmail: 'mike@example.com', doctor: 'Dr. Emma Williams', date: '2026-02-07', time: '9:00 AM', status: 'Pending', test: 'Glucose Test', amount: 120 },
-    { id: 4, patient: 'Sarah Davis', patientEmail: 'sarah@example.com', doctor: 'Dr. David Brown', date: '2026-02-08', time: '11:30 AM', status: 'Completed', test: 'Complete Blood Count', amount: 180 },
-  ]);
+  // Upload Modal State
+  const [showUpload, setShowUpload] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
 
-  const handleApprove = (id: number) => {
-    setBookings(bookings.map(b => 
-      b.id === id ? { ...b, status: 'Approved' as const } : b
-    ));
-    toast.success('Booking approved successfully!');
+  const fetchBookings = () => {
+    setLoading(true);
+    fetch('http://localhost:5000/appointments')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setBookings(data);
+        } else {
+          setBookings([]);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Booking fetch error:", err);
+        setBookings([]);
+        setLoading(false);
+      });
   };
 
-  const handleCancel = (id: number) => {
-    setBookings(bookings.map(b => 
-      b.id === id ? { ...b, status: 'Cancelled' as const } : b
-    ));
-    toast.success('Booking cancelled');
+  useEffect(() => { fetchBookings(); }, []);
+
+  const handleStatusUpdate = async (id: string, status: string, extraData = {}) => {
+    try {
+      const res = await fetch(`http://localhost:5000/appointments/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ status, ...extraData })
+      });
+      if (res.ok) {
+        toast.success(`Status updated to: ${status}`);
+        setShowUpload(false);
+        fetchBookings();
+      } else {
+        toast.error("Failed to update status");
+      }
+    } catch (e) { toast.error("Connection error"); }
   };
 
-  const handleComplete = (id: number) => {
-    setBookings(bookings.map(b => 
-      b.id === id ? { ...b, status: 'Completed' as const } : b
-    ));
-    toast.success('Booking marked as completed');
+  const handleDelete = async (id: string) => {
+    if(!confirm("Delete this booking?")) return;
+    try {
+      await fetch(`http://localhost:5000/appointments/${id}`, { method: 'DELETE' });
+      toast.success("Deleted");
+      fetchBookings();
+    } catch (e) { toast.error("Delete failed"); }
   };
 
-  const filteredBookings = bookings.filter(booking => {
-    const matchesSearch = booking.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         booking.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         booking.test.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || booking.status.toLowerCase() === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const stats = {
-    total: bookings.length,
-    pending: bookings.filter(b => b.status === 'Pending').length,
-    approved: bookings.filter(b => b.status === 'Approved').length,
-    completed: bookings.filter(b => b.status === 'Completed').length,
-    revenue: bookings.filter(b => b.status === 'Completed').reduce((sum, b) => sum + b.amount, 0),
+  const openUploadModal = (id: string) => {
+    setSelectedBookingId(id);
+    setShowUpload(true);
   };
+
+  const confirmUpload = () => {
+    if(!file || !selectedBookingId) return toast.error("Please select a file");
+    handleStatusUpdate(selectedBookingId, 'ResultsReady', { resultFile: file.name });
+  };
+
+  const filtered = bookings.filter(b => 
+    (b.patientName || 'Guest').toLowerCase().includes(search.toLowerCase()) ||
+    (b.doctorName || '').toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 p-4">
-        <div className="container mx-auto max-w-7xl">
-          <button onClick={() => navigate('/admin')} className="flex items-center gap-2 mb-4 text-[#A9A9A9] hover:text-[#333333]">
-            <ArrowLeft size={20} />
-            Back to Dashboard
-          </button>
-          <h1>Bookings Management</h1>
-          <p className="text-sm text-[#A9A9A9] mt-1">View and manage all appointment bookings</p>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <Button variant="ghost" onClick={() => navigate('/admin')} className="mb-4">
+        <ArrowLeft size={16} className="mr-2"/> Dashboard
+      </Button>
+      
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Booking Control Center</h1>
+        <div className="relative w-72">
+          <Search className="absolute left-2 top-2.5 text-gray-400" size={18}/>
+          <Input placeholder="Search patient..." className="pl-9 bg-white" value={search} onChange={e => setSearch(e.target.value)}/>
         </div>
       </div>
 
-      <div className="container mx-auto max-w-7xl p-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-            <p className="text-sm text-[#A9A9A9] mb-1">Total Bookings</p>
-            <p className="text-2xl font-semibold">{stats.total}</p>
-          </div>
-          <div className="bg-yellow-50 rounded-lg p-4 shadow-sm border border-yellow-200">
-            <p className="text-sm text-yellow-700 mb-1">Pending</p>
-            <p className="text-2xl font-semibold text-yellow-600">{stats.pending}</p>
-          </div>
-          <div className="bg-green-50 rounded-lg p-4 shadow-sm border border-green-200">
-            <p className="text-sm text-green-700 mb-1">Approved</p>
-            <p className="text-2xl font-semibold text-green-600">{stats.approved}</p>
-          </div>
-          <div className="bg-blue-50 rounded-lg p-4 shadow-sm border border-blue-200">
-            <p className="text-sm text-blue-700 mb-1">Completed</p>
-            <p className="text-2xl font-semibold text-blue-600">{stats.completed}</p>
-          </div>
-          <div className="bg-[#FFC0CB] bg-opacity-20 rounded-lg p-4 shadow-sm border border-[#FFC0CB]">
-            <p className="text-sm text-[#FFC0CB] mb-1">Revenue</p>
-            <p className="text-2xl font-semibold text-[#FFC0CB]">${stats.revenue}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calendar & Filters */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <h2 className="mb-4">Select Date</h2>
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                className="rounded-md"
-              />
-            </div>
-
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <h2 className="mb-4">Filters</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-[#A9A9A9] mb-2 block">Status</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A9A9A9]" size={16} />
-                  <Input
-                    placeholder="Search bookings..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+      <div className="space-y-4">
+        {loading ? <Loader2 className="animate-spin mx-auto"/> : filtered.length === 0 ? (
+          <div className="text-center text-gray-500 py-10">No bookings found.</div>
+        ) : filtered.map(item => (
+          <div key={item._id} className="bg-white p-5 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-center border hover:border-pink-200 transition-all gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <span className={`px-2 py-0.5 rounded text-xs font-bold text-white uppercase
+                  ${item.status === 'Confirmed' ? 'bg-blue-500' : item.status === 'Completed' ? 'bg-yellow-500' : 'bg-green-500'}`}>
+                  {item.status}
+                </span>
+                <h3 className="font-bold text-lg">{item.patientName || 'Unknown Patient'}</h3>
+              </div>
+              <div className="text-sm text-gray-500 grid grid-cols-1 md:grid-cols-3 gap-2">
+                <span>👨‍⚕️ {item.doctorName}</span>
+                <span>📅 {item.date} at {item.time}</span>
+                <span className="text-green-600 font-medium">Paid: ${item.amount}</span>
               </div>
             </div>
+
+            <div className="flex gap-2">
+              {item.status === 'Confirmed' && (
+                <Button size="sm" onClick={() => handleStatusUpdate(item._id, 'Completed')} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <CheckCircle size={16} className="mr-1"/> Mark Examined
+                </Button>
+              )}
+              {item.status === 'Completed' && (
+                <Button size="sm" onClick={() => openUploadModal(item._id)} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  <Upload size={16} className="mr-1"/> Upload Result
+                </Button>
+              )}
+              {item.status === 'ResultsReady' && (
+                <Button size="sm" variant="outline" className="text-green-600 border-green-200 bg-green-50 cursor-default">
+                  <FileText size={16} className="mr-1"/> Sent
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => handleDelete(item._id)} className="text-red-500 border-red-200 hover:bg-red-50">
+                <Trash2 size={16}/>
+              </Button>
+            </div>
           </div>
-
-          {/* Bookings List */}
-          <div className="lg:col-span-2 space-y-4">
-            {filteredBookings.length === 0 ? (
-              <div className="bg-white rounded-lg p-12 text-center shadow-sm border border-gray-200">
-                <CalendarIcon size={48} className="mx-auto text-[#A9A9A9] mb-4" />
-                <p className="text-[#A9A9A9]">No bookings found</p>
-              </div>
-            ) : (
-              filteredBookings.map((booking) => (
-                <div key={booking.id} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="mb-1">Booking #{booking.id.toString().padStart(4, '0')}</h3>
-                      <p className="text-sm text-[#A9A9A9]">{booking.test}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      booking.status === 'Approved'
-                        ? 'bg-green-100 text-green-600'
-                        : booking.status === 'Pending'
-                        ? 'bg-yellow-100 text-yellow-600'
-                        : booking.status === 'Completed'
-                        ? 'bg-blue-100 text-blue-600'
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      {booking.status}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                    <div>
-                      <p className="text-[#A9A9A9] text-xs mb-1">Patient</p>
-                      <p className="font-medium">{booking.patient}</p>
-                      <p className="text-xs text-[#A9A9A9]">{booking.patientEmail}</p>
-                    </div>
-                    <div>
-                      <p className="text-[#A9A9A9] text-xs mb-1">Doctor</p>
-                      <p className="font-medium">{booking.doctor}</p>
-                    </div>
-                    <div>
-                      <p className="text-[#A9A9A9] text-xs mb-1">Date & Time</p>
-                      <p className="flex items-center gap-1 font-medium">
-                        <CalendarIcon size={14} />
-                        {new Date(booking.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                      <p className="text-xs text-[#A9A9A9]">{booking.time}</p>
-                    </div>
-                    <div>
-                      <p className="text-[#A9A9A9] text-xs mb-1">Amount</p>
-                      <p className="font-medium text-[#FFC0CB]">${booking.amount}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {booking.status === 'Pending' && (
-                      <>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleApprove(booking.id)}
-                          className="flex-1 bg-green-500 hover:bg-green-600 text-white"
-                        >
-                          <CheckCircle size={16} className="mr-2" />
-                          Approve
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleCancel(booking.id)}
-                          variant="outline" 
-                          className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                          <XCircle size={16} className="mr-2" />
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    {booking.status === 'Approved' && (
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleComplete(booking.id)}
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                      >
-                        <CheckCircle size={16} className="mr-2" />
-                        Mark as Completed
-                      </Button>
-                    )}
-                    {(booking.status === 'Completed' || booking.status === 'Cancelled') && (
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="w-full"
-                        disabled
-                      >
-                        {booking.status}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        ))}
       </div>
+
+      {/* --- UPLOAD MODAL --- */}
+      {showUpload && (
+        <div className="fixed inset-0 bg-[#FFC0CB]/30 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-96 border border-pink-100">
+            <div className="flex justify-between mb-4">
+              <h3 className="font-bold text-lg">Upload Patient Results</h3>
+              <button onClick={() => setShowUpload(false)}><X size={20}/></button>
+            </div>
+            {/* ĐÃ SỬA LỖI CÚ PHÁP TẠI ĐÂY: type="file" */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4 bg-gray-50 hover:bg-white transition-colors cursor-pointer relative">
+              <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer"/>
+              <Upload className="mx-auto text-gray-400 mb-2" size={32}/>
+              <p className="text-sm text-gray-600">{file ? file.name : "Click to select PDF"}</p>
+            </div>
+            <Button onClick={confirmUpload} className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white">
+              Confirm Upload
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

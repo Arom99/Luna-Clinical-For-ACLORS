@@ -1,52 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { useApp } from '@/app/context/AppContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const countryCodes = [
   { code: '+61', country: 'Australia', flag: '🇦🇺' },
   { code: '+1', country: 'United States', flag: '🇺🇸' },
-  { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
-  { code: '+86', country: 'China', flag: '🇨🇳' },
-  { code: '+91', country: 'India', flag: '🇮🇳' },
-  { code: '+81', country: 'Japan', flag: '🇯🇵' },
-  { code: '+82', country: 'South Korea', flag: '🇰🇷' },
-  { code: '+65', country: 'Singapore', flag: '🇸🇬' },
-  { code: '+852', country: 'Hong Kong', flag: '🇭🇰' },
-  { code: '+64', country: 'New Zealand', flag: '🇳🇿' },
-  { code: '+49', country: 'Germany', flag: '🇩🇪' },
-  { code: '+33', country: 'France', flag: '🇫🇷' },
-  { code: '+39', country: 'Italy', flag: '🇮🇹' },
-  { code: '+34', country: 'Spain', flag: '🇪🇸' },
-  { code: '+7', country: 'Russia', flag: '🇷🇺' },
-  { code: '+55', country: 'Brazil', flag: '🇧🇷' },
-  { code: '+52', country: 'Mexico', flag: '🇲🇽' },
-  { code: '+27', country: 'South Africa', flag: '🇿🇦' },
-  { code: '+971', country: 'UAE', flag: '🇦🇪' },
-  { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
+  { code: '+84', country: 'Vietnam', flag: '🇻🇳' },
 ];
 
-const insuranceProviders = [
-  'Medicare',
-  'Bupa',
-  'Medibank',
-  'HCF',
-  'NIB',
-  'Australian Unity',
-  'Teachers Health',
-  'HBF',
-  'GMHBA',
-  'Other',
-];
+const insuranceProviders = ['Medicare', 'Bupa', 'Medibank', 'HCF', 'NIB', 'Other'];
 
 export const EditProfileScreen = () => {
   const navigate = useNavigate();
-  const { userProfile, updateUserProfile } = useApp();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [dbUser, setDbUser] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -62,217 +36,148 @@ export const EditProfileScreen = () => {
     emergencyPhone: '',
   });
 
+  // 1. FETCH USER DATA FROM DB
   useEffect(() => {
-    if (userProfile) {
-      setFormData({
-        name: userProfile.name || '',
-        email: userProfile.email || '',
-        phone: userProfile.phone || '',
-        countryCode: userProfile.countryCode || '+61',
-        medicalNumber: userProfile.medicalNumber || '',
-        insuranceProvider: userProfile.insuranceProvider || '',
-        insuranceNumber: userProfile.insuranceNumber || '',
-        dateOfBirth: userProfile.dateOfBirth || '',
-        address: userProfile.address || '',
-        emergencyContact: userProfile.emergencyContact || '',
-        emergencyPhone: userProfile.emergencyPhone || '',
-      });
+    if (user?.email) {
+      fetch(`http://localhost:5000/users/email/${user.email}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            setDbUser(data);
+            // Fill form with DB data or empty strings
+            setFormData({
+              name: data.name || '',
+              email: data.email || '',
+              phone: data.phone || '',
+              countryCode: data.countryCode || '+61',
+              medicalNumber: data.medicalNumber || '',
+              insuranceProvider: data.insuranceProvider || '',
+              insuranceNumber: data.insuranceNumber || '',
+              dateOfBirth: data.dateOfBirth || '',
+              address: data.address || '',
+              emergencyContact: data.emergencyContact || '',
+              emergencyPhone: data.emergencyPhone || '',
+            });
+          }
+          setLoading(false);
+        })
+        .catch(() => {
+          toast.error("Could not fetch user data");
+          setLoading(false);
+        });
     }
-  }, [userProfile]);
+  }, [user]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    updateUserProfile(formData);
-    toast.success('Profile updated successfully!');
-    setTimeout(() => navigate('/profile'), 500);
+  const handleSave = async () => {
+    if (!dbUser?._id) {
+      toast.error("User ID not found. Please log in again.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/users/${dbUser._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (res.ok) {
+        toast.success('Profile saved successfully!');
+        setTimeout(() => navigate('/profile'), 500);
+      } else {
+        toast.error("Failed to save profile");
+      }
+    } catch (e) {
+      toast.error("Connection Error");
+    }
   };
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#FFC0CB]"/></div>;
 
   return (
     <div className="min-h-screen bg-white pb-20">
       <div className="bg-[#FFC0CB] text-white p-4 md:p-6">
         <div className="container mx-auto max-w-3xl">
-          <button onClick={() => navigate('/profile')} className="flex items-center gap-2 mb-2">
+          <button onClick={() => navigate('/profile')} className="flex items-center gap-2 mb-2 hover:opacity-80">
             <ArrowLeft size={20} />
-            <span>Back</span>
+            <span>Back to Profile</span>
           </button>
-          <h1 className="text-white">Edit Profile</h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-white text-2xl font-bold">Edit Profile</h1>
+            <div className="bg-white/20 px-3 py-1 rounded-full text-sm flex items-center gap-2">
+              <UserIcon size={14}/> ID: {dbUser?.customId || 'N/A'}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 md:px-8 py-6 max-w-3xl">
         <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-6">
-          {/* Personal Information */}
-          <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg">
-            <h2 className="mb-4">Personal Information</h2>
-            
+          
+          <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg border border-blue-50">
+            <h2 className="mb-4 font-bold text-gray-700">Personal Information</h2>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  placeholder="Enter your full name"
-                  className="mt-1"
-                />
+                <Label>Full Name</Label>
+                <Input value={formData.name} onChange={(e) => handleChange('name', e.target.value)} className="mt-1 bg-white"/>
               </div>
-
               <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  placeholder="your.email@example.com"
-                  className="mt-1"
-                  disabled
-                />
-                <p className="text-xs text-[#A9A9A9] mt-1">Email cannot be changed</p>
+                <Label>Email</Label>
+                <Input value={formData.email} disabled className="mt-1 bg-gray-100 text-gray-500 cursor-not-allowed"/>
               </div>
-
               <div>
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label>Phone</Label>
                 <div className="flex gap-2 mt-1">
                   <Select value={formData.countryCode} onValueChange={(val) => handleChange('countryCode', val)}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="w-[100px] bg-white"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {countryCodes.map((country) => (
-                        <SelectItem key={country.code} value={country.code}>
-                          {country.flag} {country.code}
-                        </SelectItem>
-                      ))}
+                      {countryCodes.map((c) => <SelectItem key={c.code} value={c.code}>{c.flag} {c.code}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                    placeholder="412345678"
-                    className="flex-1"
-                  />
+                  <Input value={formData.phone} onChange={(e) => handleChange('phone', e.target.value)} className="flex-1 bg-white"/>
                 </div>
               </div>
-
               <div>
-                <Label htmlFor="dob">Date of Birth</Label>
-                <Input
-                  id="dob"
-                  type="date"
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleChange('dateOfBirth', e.target.value)}
-                  className="mt-1"
-                />
+                <Label>Date of Birth</Label>
+                <Input type="date" value={formData.dateOfBirth} onChange={(e) => handleChange('dateOfBirth', e.target.value)} className="mt-1 bg-white"/>
               </div>
-
               <div>
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => handleChange('address', e.target.value)}
-                  placeholder="123 Health St, Sydney NSW 2000"
-                  className="mt-1"
-                />
+                <Label>Address</Label>
+                <Input value={formData.address} onChange={(e) => handleChange('address', e.target.value)} className="mt-1 bg-white"/>
               </div>
             </div>
           </div>
 
-          {/* Medical Information */}
-          <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg">
-            <h2 className="mb-4">Medical Information</h2>
-            
+          <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg border border-blue-50">
+            <h2 className="mb-4 font-bold text-gray-700">Medical Details</h2>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="medicalNumber">Medicare Number</Label>
-                <Input
-                  id="medicalNumber"
-                  value={formData.medicalNumber}
-                  onChange={(e) => handleChange('medicalNumber', e.target.value)}
-                  placeholder="1234 56789 0"
-                  className="mt-1"
-                />
+                <Label>Medicare Number</Label>
+                <Input value={formData.medicalNumber} onChange={(e) => handleChange('medicalNumber', e.target.value)} className="mt-1 bg-white"/>
               </div>
-
               <div>
-                <Label htmlFor="insuranceProvider">Insurance Provider</Label>
+                <Label>Insurance Provider</Label>
                 <Select value={formData.insuranceProvider} onValueChange={(val) => handleChange('insuranceProvider', val)}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
+                  <SelectTrigger className="mt-1 bg-white"><SelectValue placeholder="Select provider" /></SelectTrigger>
                   <SelectContent>
-                    {insuranceProviders.map((provider) => (
-                      <SelectItem key={provider} value={provider}>
-                        {provider}
-                      </SelectItem>
-                    ))}
+                    {insuranceProviders.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
               <div>
-                <Label htmlFor="insuranceNumber">Insurance Policy Number</Label>
-                <Input
-                  id="insuranceNumber"
-                  value={formData.insuranceNumber}
-                  onChange={(e) => handleChange('insuranceNumber', e.target.value)}
-                  placeholder="MED-123456"
-                  className="mt-1"
-                />
+                <Label>Policy Number</Label>
+                <Input value={formData.insuranceNumber} onChange={(e) => handleChange('insuranceNumber', e.target.value)} className="mt-1 bg-white"/>
               </div>
             </div>
           </div>
 
-          {/* Emergency Contact */}
-          <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg">
-            <h2 className="mb-4">Emergency Contact</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="emergencyContact">Contact Name</Label>
-                <Input
-                  id="emergencyContact"
-                  value={formData.emergencyContact}
-                  onChange={(e) => handleChange('emergencyContact', e.target.value)}
-                  placeholder="Jane Doe"
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="emergencyPhone">Contact Phone</Label>
-                <Input
-                  id="emergencyPhone"
-                  value={formData.emergencyPhone}
-                  onChange={(e) => handleChange('emergencyPhone', e.target.value)}
-                  placeholder="+61 400 000 000"
-                  className="mt-1"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-4 sticky bottom-4 bg-white p-4 -mx-4 border-t border-gray-200">
-            <Button
-              type="button"
-              onClick={() => navigate('/profile')}
-              variant="outline"
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white"
-            >
-              <Save size={16} className="mr-2" />
-              Save Changes
+          <div className="sticky bottom-4 pt-4 bg-white border-t">
+            <Button type="submit" className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12 text-lg shadow-md">
+              <Save size={18} className="mr-2" /> Save Changes
             </Button>
           </div>
         </form>

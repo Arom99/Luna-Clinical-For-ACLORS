@@ -1,173 +1,109 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { ArrowLeft, Search, Star, MapPin, Heart } from 'lucide-react';
-import { doctors } from '@/app/data/doctors';
 
 export const DoctorsListScreen = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [selectedLocation, setSelectedLocation] = useState<string>(location.state?.locationId || 'all');
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState('all');
 
-  const filters = ['All', 'Available Now', 'Top Rated'];
+  useEffect(() => {
+    fetch('http://localhost:5000/doctors')
+      .then(res => res.json())
+      .then(data => setDoctors(data));
+  }, []);
 
-  // Get unique locations and specialties
-  const locations = Array.from(new Set(doctors.map(d => d.location)));
-  const specialties = Array.from(new Set(doctors.map(d => d.specialty)));
+  // Filter Logic
+  const filtered = doctors.filter(d => {
+    const matchesSearch = d.name.toLowerCase().includes(search.toLowerCase()) || d.specialty.toLowerCase().includes(search.toLowerCase());
+    const matchesLoc = selectedLocation === 'all' || d.location === selectedLocation;
+    const matchesSpec = selectedSpecialty === 'all' || d.specialty === selectedSpecialty;
+    return matchesSearch && matchesLoc && matchesSpec;
+  });
 
-  // Filter doctors
-  let filteredDoctors = doctors.filter(
-    (doc) =>
-      (doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.location.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (selectedLocation === 'all' || doc.locationId === selectedLocation) &&
-      (selectedSpecialty === 'all' || doc.specialty === selectedSpecialty)
-  );
-
-  if (selectedFilter === 'available-now') {
-    filteredDoctors = filteredDoctors.filter(d => d.available);
-  } else if (selectedFilter === 'top-rated') {
-    filteredDoctors = filteredDoctors.filter(d => d.rating >= 4.8);
-  }
+  // Unique values for dropdowns
+  const uniqueLocations = Array.from(new Set(doctors.map(d => d.location)));
+  const uniqueSpecialties = Array.from(new Set(doctors.map(d => d.specialty)));
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="bg-[#FFC0CB] text-white p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50">
+      {/* HEADER MÀU HỒNG GỐC (#FFC0CB) */}
+      <div className="bg-[#FFC0CB] text-white p-6 pb-12 rounded-b-[2.5rem] shadow-lg">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex items-center gap-4 mb-4">
-            <button onClick={() => navigate('/home')} className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full">
-              <ArrowLeft size={20} />
-            </button>
-            <h1 className="text-white">Find Doctors</h1>
-          </div>
-
-          {/* Search Bar */}
+          <button onClick={() => navigate('/home')} className="flex items-center gap-2 mb-6 hover:opacity-80"><ArrowLeft size={20}/> Back</button>
+          <h1 className="text-3xl font-bold mb-4">Find Doctors</h1>
+          
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A9A9A9]" size={20} />
-            <Input
-              placeholder="Search doctors, specialties..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-0"
+            <Search className="absolute left-4 top-3.5 text-[#FFC0CB]" size={20}/>
+            <Input 
+              placeholder="Search by name, specialist..." 
+              className="pl-12 h-12 rounded-2xl bg-white border-0 text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:ring-white/50"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
             />
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="container mx-auto px-4 md:px-8 py-6 max-w-7xl">
-        {/* Filters Row */}
-        <div className="grid md:grid-cols-3 gap-3 mb-4">
+      <div className="container mx-auto px-4 -mt-6 pb-10 max-w-7xl">
+        {/* Filters */}
+        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide mb-2">
           <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Locations" />
+            <SelectTrigger className="w-[140px] rounded-full bg-white border-gray-200 shadow-sm">
+              <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((loc) => (
-                <SelectItem key={loc} value={doctors.find(d => d.location === loc)?.locationId || loc}>
-                  {loc}
-                </SelectItem>
-              ))}
+              {uniqueLocations.map((loc: any) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Specialties" />
+            <SelectTrigger className="w-[150px] rounded-full bg-white border-gray-200 shadow-sm">
+              <SelectValue placeholder="Specialty" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Specialties</SelectItem>
-              {specialties.map((spec) => (
-                <SelectItem key={spec} value={spec}>
-                  {spec}
-                </SelectItem>
-              ))}
+              {uniqueSpecialties.map((spec: any) => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
             </SelectContent>
           </Select>
-
-          <div className="flex gap-2">
-            {filters.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setSelectedFilter(filter.toLowerCase().replace(' ', '-'))}
-                className={`px-4 py-2 rounded-full whitespace-nowrap text-sm ${
-                  selectedFilter === filter.toLowerCase().replace(' ', '-')
-                    ? 'bg-[#FFC0CB] text-white'
-                    : 'bg-gray-100 text-[#A9A9A9]'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
         </div>
 
-        <p className="text-sm text-[#A9A9A9] mb-4">
-          {filteredDoctors.length} doctor{filteredDoctors.length !== 1 ? 's' : ''} found
-        </p>
-
-        {/* Doctors Grid - Mobile: 1 col, Desktop: 2 cols */}
+        {/* Doctors Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredDoctors.map((doctor) => (
-            <div
-              key={doctor.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex gap-4">
-                {/* Avatar */}
-                <div className="w-16 h-16 bg-[#ADD8E6] rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl">👨‍⚕️</span>
+          {filtered.map(doc => (
+            <div key={doc.id} className="bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-gray-100 flex gap-4 group">
+              <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 group-hover:bg-[#FFC0CB]/20 transition-colors">
+                👨‍⚕️
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-800">{doc.name}</h3>
+                    <p className="text-[#FFC0CB] text-sm font-medium">{doc.specialty}</p>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs font-bold bg-yellow-50 text-yellow-600 px-2 py-1 rounded-lg">
+                    <Star size={12} fill="currentColor"/> {doc.rating}
+                  </div>
                 </div>
-
-                {/* Info */}
-                <div className="flex-1">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="text-lg">{doctor.name}</h3>
-                    <button className={`p-1 ${doctor.favorite ? 'text-red-500' : 'text-gray-300'}`}>
-                      <Heart size={20} fill={doctor.favorite ? 'currentColor' : 'none'} />
-                    </button>
-                  </div>
-                  <p className="text-sm text-[#A9A9A9] mb-2">{doctor.specialty}</p>
-                  
-                  <div className="flex items-center gap-4 text-sm mb-3">
-                    <div className="flex items-center gap-1">
-                      <Star size={16} className="text-yellow-400" fill="currentColor" />
-                      <span>{doctor.rating}</span>
-                      <span className="text-[#A9A9A9]">({doctor.reviews})</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[#A9A9A9]">
-                      <MapPin size={16} />
-                      <span>{doctor.location}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => navigate(`/doctor/${doctor.id}`)}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-[#FFC0CB] text-[#FFC0CB] hover:bg-[#FFC0CB] hover:text-white"
-                    >
-                      View Profile
-                    </Button>
-                    <Button
-                      onClick={() => navigate(`/schedule/${doctor.id}`)}
-                      size="sm"
-                      className="flex-1 bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white"
-                      disabled={!doctor.available}
-                    >
-                      {doctor.available ? 'Book Now' : 'Unavailable'}
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-1 text-gray-400 text-xs mt-2 mb-4">
+                  <MapPin size={12}/> {doc.location}
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => navigate(`/schedule/${doc.id}`)} 
+                    className="flex-1 bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white rounded-xl h-10 text-sm shadow-sm"
+                  >
+                    Book Now
+                  </Button>
+                  <Button variant="outline" className="h-10 w-10 p-0 rounded-xl border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200">
+                    <Heart size={18}/>
+                  </Button>
                 </div>
               </div>
             </div>

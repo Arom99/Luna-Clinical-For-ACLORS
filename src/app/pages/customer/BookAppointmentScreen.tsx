@@ -1,295 +1,198 @@
-import { doctors } from '@/app/data/doctors';
-import { Doctor } from '@/app/data/doctors';
-import { locations } from '@/app/data/locations';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useApp } from '@/app/context/AppContext';
+import { useAuth } from '@/app/context/AuthContext';
 import { Button } from '@/app/components/ui/button';
 import { Calendar } from '@/app/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group';
 import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
-import { ArrowLeft, Clock, MapPin, CreditCard, Shield, DollarSign, Check } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, CreditCard, Shield, Plus, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 export const BookAppointmentScreen = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { addAppointment } = useApp();
+  const { user } = useAuth();
   
-  const doctor = doctors.find(d => d.id === id);
+  const [doctor, setDoctor] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState(1);
   
-  const [step, setStep] = useState(1); // 1: Location & Time, 2: Payment
-  const [selectedLocationId, setSelectedLocationId] = useState(doctor?.locationId || '');
+  // Booking Data
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedTime, setSelectedTime] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('credit-card');
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
-  const availableSlots = [
-    '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM',
-    '11:00 AM', '11:30 AM', '2:00 PM', '2:30 PM',
-    '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM',
-  ];
+  // Payment Data
+  const [savedCards, setSavedCards] = useState<any[]>([]);
+  const [selectedCardIndex, setSelectedCardIndex] = useState<number>(-1); // -1 means add new card
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const selectedLocation = locations.find(l => l.id === selectedLocationId);
-  const consultationFee = doctor?.consultationFee || 150;
+  // Slots
+  const allSlots = ['9:00 AM', '10:00 AM', '11:00 AM', '2:00 PM', '3:00 PM', '4:00 PM'];
 
-  const handleContinueToPayment = () => {
-    if (!date || !selectedTime || !selectedLocationId) {
-      toast.error('Please complete all fields');
-      return;
+  // 1. Fetch Doctor & User Cards
+  useEffect(() => {
+    // Fetch Doctor
+    fetch(`http://localhost:5000/doctors/${id}`)
+      .then(res => res.json())
+      .then(data => { setDoctor(data); setLoading(false); })
+      .catch(() => setLoading(false));
+
+    // Fetch User Cards (Mocking fetching from DB based on logged in user)
+    if (user?.email) {
+      fetch(`http://localhost:5000/users/email/${user.email}`)
+        .then(res => res.json())
+        .then(userData => {
+          if (userData && userData.savedCards) {
+            setSavedCards(userData.savedCards);
+            if (userData.savedCards.length > 0) setSelectedCardIndex(0); // Select first card by default
+          }
+        });
     }
-    setStep(2);
-  };
+  }, [id, user]);
 
-  const handleConfirmBooking = () => {
-    if (!doctor || !date || !selectedTime || !selectedLocation) return;
+  // 2. Fetch Slots availability
+  useEffect(() => {
+    if (doctor && date) {
+      const formattedDate = format(date, 'MMM dd, yyyy');
+      fetch(`http://localhost:5000/booked-slots?doctorId=${doctor.id}&date=${formattedDate}`)
+        .then(res => res.json())
+        .then(data => setBookedSlots(data));
+    }
+  }, [date, doctor]);
 
-    const newAppointment = {
-      id: Date.now().toString(),
+  const handleBooking = async () => {
+    setIsProcessing(true);
+    // Simulate Payment Processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const bookingData = {
       doctorId: doctor.id,
       doctorName: doctor.name,
       specialty: doctor.specialty,
-      date: format(date, 'yyyy-MM-dd'),
+      date: format(date!, 'MMM dd, yyyy'),
       time: selectedTime,
-      location: selectedLocation.name,
-      locationId: selectedLocation.id,
-      status: 'upcoming' as const,
-      paymentStatus: 'paid' as const,
-      amount: consultationFee,
-      notes,
+      location: doctor.location,
+      amount: doctor.consultationFee,
+      notes: notes,
+      patientName: user?.name || "Guest",
+      paymentStatus: 'Paid'
     };
 
-    addAppointment(newAppointment);
-    toast.success('Appointment booked successfully!');
-    navigate('/appointments');
+    try {
+      const res = await fetch('http://localhost:5000/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookingData)
+      });
+
+      if (res.ok) {
+        toast.success("Booking Confirmed! Receipt sent to email.");
+        navigate('/appointments');
+      } else {
+        toast.error("Slot taken! Please check available times.");
+      }
+    } catch (e) { toast.error("Connection Error"); }
+    finally { setIsProcessing(false); }
   };
 
-  if (!doctor) {
-    return <div>Doctor not found</div>;
-  }
+  if (loading || !doctor) return <div className="p-10 text-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-white pb-20">
-      <div className="bg-[#FFC0CB] text-white p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="bg-[#FFC0CB] text-white p-6">
         <div className="container mx-auto max-w-4xl">
-          <button onClick={() => step === 1 ? navigate(`/doctor/${id}`) : setStep(1)} className="flex items-center gap-2 mb-2">
-            <ArrowLeft size={20} />
-            <span>Back</span>
+          <button onClick={() => step === 1 ? navigate('/doctors') : setStep(1)} className="flex items-center gap-2 mb-4">
+            <ArrowLeft size={20} /> Back
           </button>
-          <h1 className="text-white">Book Appointment</h1>
-          <p className="text-sm opacity-90 mt-1">
-            Step {step} of 2: {step === 1 ? 'Select Date & Time' : 'Payment'}
-          </p>
+          <h1 className="text-2xl font-bold">{step === 1 ? 'Select Time' : 'Payment'}</h1>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 md:px-8 py-6 max-w-4xl">
-        {/* Doctor Info Card */}
-        <div className="bg-[#ADD8E6] bg-opacity-10 p-4 rounded-lg mb-6 flex items-center gap-4">
-          <div className="w-16 h-16 bg-[#ADD8E6] rounded-full flex items-center justify-center">
-            <span className="text-3xl">👨‍⚕️</span>
-          </div>
-          <div>
-            <h3>{doctor.name}</h3>
-            <p className="text-sm text-[#A9A9A9]">{doctor.specialty}</p>
-            <p className="text-sm font-medium text-[#FFC0CB]">${consultationFee} consultation fee</p>
-          </div>
-        </div>
-
-        {step === 1 ? (
-          <>
-            {/* Location Selection */}
-            <div className="mb-6">
-              <Label htmlFor="location" className="mb-2 block">Select Location</Label>
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={14} />
-                        {loc.name} - {loc.suburb}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <div className="container mx-auto px-4 -mt-6 max-w-4xl">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          {/* Doctor Info */}
+          <div className="flex justify-between items-center mb-6 border-b pb-4">
+            <div>
+              <h3 className="font-bold text-lg">{doctor.name}</h3>
+              <p className="text-gray-500">{doctor.specialty}</p>
             </div>
+            <p className="text-xl font-bold text-[#FFC0CB]">${doctor.consultationFee}</p>
+          </div>
 
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              {/* Calendar */}
-              <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg">
-                <h2 className="mb-4">Select Date</h2>
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  className="rounded-md border"
-                  disabled={(date) => date < new Date()}
-                />
-              </div>
-
-              {/* Time Slots */}
+          {step === 1 ? (
+            <div className="grid md:grid-cols-2 gap-8">
               <div>
-                <h2 className="mb-4">Select Time</h2>
-                {date ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {availableSlots.map((time) => (
-                      <button
-                        key={time}
-                        onClick={() => setSelectedTime(time)}
-                        className={`p-3 rounded-lg border transition-all text-sm ${
-                          selectedTime === time
-                            ? 'bg-[#FFC0CB] text-white border-[#FFC0CB]'
-                            : 'border-gray-200 hover:border-[#FFC0CB]'
-                        }`}
-                      >
-                        <Clock size={14} className="inline mr-1" />
+                <Label className="mb-2 block">Date</Label>
+                <Calendar mode="single" selected={date} onSelect={setDate} className="border rounded-md w-full" disabled={(d) => d < new Date()} />
+              </div>
+              <div>
+                <Label className="mb-2 block">Available Slots</Label>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {allSlots.map(time => {
+                    const isTaken = bookedSlots.includes(time);
+                    return (
+                      <button key={time} onClick={() => !isTaken && setSelectedTime(time)} disabled={isTaken}
+                        className={`p-3 rounded border text-sm ${selectedTime === time ? 'bg-[#FFC0CB] text-white' : isTaken ? 'bg-gray-100 text-gray-400' : 'hover:border-[#FFC0CB]'}`}>
                         {time}
                       </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[#A9A9A9] text-center py-8">Please select a date first</p>
-                )}
+                    )
+                  })}
+                </div>
+                <Label>Notes</Label>
+                <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Symptoms..." className="mt-2"/>
+                <Button onClick={() => setStep(2)} disabled={!date || !selectedTime} className="w-full mt-6 bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white">Continue</Button>
               </div>
             </div>
+          ) : (
+            <div>
+              <h3 className="font-bold mb-4">Select Payment Method</h3>
+              
+              {/* Saved Cards List */}
+              <div className="space-y-3 mb-6">
+                {savedCards.map((card, index) => (
+                  <div key={index} onClick={() => setSelectedCardIndex(index)}
+                    className={`p-4 border rounded-lg flex items-center justify-between cursor-pointer ${selectedCardIndex === index ? 'border-[#FFC0CB] bg-pink-50 ring-1 ring-[#FFC0CB]' : 'hover:bg-gray-50'}`}>
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="text-gray-600"/>
+                      <div>
+                        <p className="font-medium">{card.brand} •••• {card.last4}</p>
+                        <p className="text-xs text-gray-500">Expires {card.expiry}</p>
+                      </div>
+                    </div>
+                    {selectedCardIndex === index && <CheckCircle className="text-[#FFC0CB]" size={20}/>}
+                  </div>
+                ))}
 
-            {/* Notes */}
-            <div className="mb-6">
-              <Label htmlFor="notes">Additional Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any specific requirements or symptoms you'd like to mention..."
-                rows={3}
-                className="mt-1"
-              />
-            </div>
-
-            <Button
-              onClick={handleContinueToPayment}
-              disabled={!date || !selectedTime || !selectedLocationId}
-              className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12"
-            >
-              Continue to Payment
-            </Button>
-          </>
-        ) : (
-          <>
-            {/* Booking Summary */}
-            <div className="bg-[#ADD8E6] bg-opacity-10 p-6 rounded-lg mb-6">
-              <h2 className="mb-4">Booking Summary</h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[#A9A9A9]">Doctor:</span>
-                  <span className="font-medium">{doctor.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#A9A9A9]">Date:</span>
-                  <span className="font-medium">{date && format(date, 'EEEE, MMMM d, yyyy')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#A9A9A9]">Time:</span>
-                  <span className="font-medium">{selectedTime}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#A9A9A9]">Location:</span>
-                  <span className="font-medium">{selectedLocation?.name}</span>
-                </div>
-                <div className="border-t border-gray-200 pt-3 mt-3"></div>
-                <div className="flex justify-between">
-                  <span className="text-[#A9A9A9]">Consultation Fee:</span>
-                  <span className="font-medium">${consultationFee}</span>
-                </div>
-                <div className="flex justify-between text-lg">
-                  <span className="font-medium">Total:</span>
-                  <span className="font-bold text-[#FFC0CB]">${consultationFee}</span>
+                {/* Add New Card Option */}
+                <div onClick={() => setSelectedCardIndex(-1)}
+                  className={`p-4 border rounded-lg flex items-center gap-3 cursor-pointer ${selectedCardIndex === -1 ? 'border-[#FFC0CB] bg-pink-50' : 'hover:bg-gray-50'}`}>
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><Plus size={20}/></div>
+                  <p className="font-medium">Pay with new card</p>
                 </div>
               </div>
-            </div>
 
-            {/* Payment Method */}
-            <div className="mb-6">
-              <h2 className="mb-4">Payment Method</h2>
-              <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg cursor-pointer hover:border-[#FFC0CB]">
-                    <RadioGroupItem value="credit-card" id="credit-card" />
-                    <Label htmlFor="credit-card" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <CreditCard size={20} className="text-[#FFC0CB]" />
-                        <div>
-                          <p className="font-medium">Credit / Debit Card</p>
-                          <p className="text-xs text-[#A9A9A9]">Visa, Mastercard, Amex</p>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg cursor-pointer hover:border-[#FFC0CB]">
-                    <RadioGroupItem value="insurance" id="insurance" />
-                    <Label htmlFor="insurance" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <Shield className="h-5 w-5 text-[#FFC0CB]" />
-                        <div>
-                          <p className="font-medium">Health Insurance</p>
-                          <p className="text-xs text-[#A9A9A9]">Direct billing to insurer</p>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg cursor-pointer hover:border-[#FFC0CB]">
-                    <RadioGroupItem value="pay-later" id="pay-later" />
-                    <Label htmlFor="pay-later" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <DollarSign size={20} className="text-[#FFC0CB]" />
-                        <div>
-                          <p className="font-medium">Pay at Clinic</p>
-                          <p className="text-xs text-[#A9A9A9]">Pay during your visit</p>
-                        </div>
-                      </div>
-                    </Label>
+              {/* Show Card Form ONLY if "New Card" selected */}
+              {selectedCardIndex === -1 && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-6 border animate-in fade-in">
+                  <Label>Card Number</Label>
+                  <input type="text" placeholder="0000 0000 0000 0000" className="w-full p-2 border rounded mt-1 mb-3"/>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Expiry</Label><input type="text" placeholder="MM/YY" className="w-full p-2 border rounded mt-1"/></div>
+                    <div><Label>CVC</Label><input type="text" placeholder="123" className="w-full p-2 border rounded mt-1"/></div>
                   </div>
                 </div>
-              </RadioGroup>
-            </div>
+              )}
 
-            {/* Confirmation */}
-            <div className="bg-[#ADD8E6] bg-opacity-10 p-4 rounded-lg mb-6 text-sm text-[#A9A9A9]">
-              <p>
-                By confirming this appointment, you agree to our{' '}
-                <button onClick={() => navigate('/privacy-policy')} className="text-[#FFC0CB] hover:underline">
-                  Terms & Conditions
-                </button>.
-                Cancellations must be made at least 24 hours in advance.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                onClick={() => setStep(1)}
-                variant="outline"
-                className="flex-1"
-              >
-                Back
+              <Button onClick={handleBooking} disabled={isProcessing} className="w-full bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12 text-lg">
+                {isProcessing ? <Loader2 className="animate-spin"/> : `Pay $${doctor.consultationFee}`}
               </Button>
-              <Button
-                onClick={handleConfirmBooking}
-                className="flex-1 bg-[#FFC0CB] hover:bg-[#FFB0BB] text-white h-12"
-              >
-                <Check size={20} className="mr-2" />
-                Confirm & Pay
-              </Button>
+              <p className="text-center text-xs text-gray-400 mt-4 flex justify-center gap-1"><Shield size={12}/> Secure Payment</p>
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

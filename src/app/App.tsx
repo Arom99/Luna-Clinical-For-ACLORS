@@ -6,6 +6,7 @@ import { Toaster } from '@/app/components/ui/sonner';
 
 // Customer Pages
 import { SplashScreen } from '@/app/pages/customer/SplashScreen';
+import { TestConnection } from '@/app/pages/customer/TestConnection';
 import { WelcomeScreen } from '@/app/pages/customer/WelcomeScreen';
 import { LoginScreen } from '@/app/pages/customer/LoginScreen';
 import { SignUpScreen } from '@/app/pages/customer/SignUpScreen';
